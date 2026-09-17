@@ -43,7 +43,7 @@ export interface TrainDirection {
   destination: string;
   nextTrainMinutes: number;
   subsequentTrainMinutes: number;
-  crowdLevel: 'Low' | 'Moderate' | 'High';
+  crowdLevel?: 'Low' | 'Moderate' | 'High';
 }
 
 export interface StationLineService {

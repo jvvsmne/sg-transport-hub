@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { TransportMode, BusStop, MRTStation } from './types';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { TransportMode, BusStop, MRTStation, TrainAlert } from './types';
 import {
   INITIAL_BUS_STOPS,
   INITIAL_MRT_STATIONS,
@@ -13,15 +13,30 @@ import {
 import { Header } from './components/Header';
 import { BusTab } from './components/BusTab';
 import { MrtTab } from './components/MrtTab';
+import {
+  checkLtaStatus,
+  fetchLiveBusStops,
+  fetchLiveBusArrivals,
+  fetchLiveTrainStations,
+  fetchLiveTrainAlerts,
+} from './services/apiClient';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TransportMode>('bus');
   const [busStops, setBusStops] = useState<BusStop[]>(INITIAL_BUS_STOPS);
   const [mrtStations, setMrtStations] = useState<MRTStation[]>(INITIAL_MRT_STATIONS);
+  const [serviceAlerts, setServiceAlerts] = useState<TrainAlert[]>(TRAIN_SERVICE_ALERTS);
+
   const [selectedStop, setSelectedStop] = useState<BusStop | null>(INITIAL_BUS_STOPS[0]);
   const [selectedStation, setSelectedStation] = useState<MRTStation | null>(INITIAL_MRT_STATIONS[0]);
+
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingArrivals, setIsLoadingArrivals] = useState(false);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string>('Just now');
+  const [isLiveMode, setIsLiveMode] = useState(false);
+
+  // Ref to track current selected stop code for async arrivals fetch
+  const selectedStopCodeRef = useRef<string | null>(INITIAL_BUS_STOPS[0]?.code || null);
 
   // Load saved favorites from localStorage
   const [favoriteStopCodes, setFavoriteStopCodes] = useState<string[]>(() => {
@@ -51,73 +66,146 @@ export default function App() {
     favoriteStopCodes.includes(stop.code)
   );
 
-  // Dynamic simulation of arrival timings countdown and updates
-  const handleRefreshTimings = useCallback(() => {
+  /**
+   * Fetch real-time arrivals for a specific bus stop code
+   */
+  const loadLiveBusArrivals = useCallback(async (stopCode: string) => {
+    setIsLoadingArrivals(true);
+    try {
+      const arrivalData = await fetchLiveBusArrivals(stopCode);
+      if (arrivalData && arrivalData.services) {
+        // Update both the selectedStop and the busStops list
+        setBusStops((prev) =>
+          prev.map((stop) => {
+            if (stop.code === stopCode) {
+              return {
+                ...stop,
+                services: arrivalData.services,
+              };
+            }
+            return stop;
+          })
+        );
+
+        setSelectedStop((prev) => {
+          if (prev && prev.code === stopCode) {
+            return {
+              ...prev,
+              services: arrivalData.services,
+            };
+          }
+          return prev;
+        });
+
+        if (arrivalData.isLive) {
+          setIsLiveMode(true);
+        }
+      }
+    } catch (err) {
+      console.warn(`Could not load live arrivals for stop ${stopCode}:`, err);
+    } finally {
+      setIsLoadingArrivals(false);
+    }
+  }, []);
+
+  /**
+   * Initial data bootstrap: check status, load bus stops, stations, and alerts
+   */
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initData() {
+      try {
+        const status = await checkLtaStatus();
+        if (isMounted && status.configured) {
+          setIsLiveMode(true);
+        }
+
+        // Fetch stops, stations and alerts in parallel
+        const [stopsResult, stationsResult, alertsResult] = await Promise.allSettled([
+          fetchLiveBusStops(),
+          fetchLiveTrainStations(),
+          fetchLiveTrainAlerts(),
+        ]);
+
+        if (isMounted) {
+          if (stopsResult.status === 'fulfilled' && stopsResult.value.stops.length > 0) {
+            setBusStops(stopsResult.value.stops);
+            if (stopsResult.value.isLive) setIsLiveMode(true);
+
+            // Select the first stop or preserve current
+            const firstStop = stopsResult.value.stops[0];
+            setSelectedStop((prev) => prev || firstStop);
+            selectedStopCodeRef.current = firstStop?.code || null;
+            if (firstStop?.code) {
+              loadLiveBusArrivals(firstStop.code);
+            }
+          }
+
+          if (stationsResult.status === 'fulfilled' && stationsResult.value.stations.length > 0) {
+            setMrtStations(stationsResult.value.stations);
+            setSelectedStation((prev) => prev || stationsResult.value.stations[0]);
+          }
+
+          if (alertsResult.status === 'fulfilled' && alertsResult.value.alerts.length > 0) {
+            setServiceAlerts(alertsResult.value.alerts);
+          }
+
+          const now = new Date();
+          setLastUpdatedTime(
+            now.toLocaleTimeString('en-SG', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: false,
+            })
+          );
+        }
+      } catch (err) {
+        console.warn('Initial data load error:', err);
+      }
+    }
+
+    initData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadLiveBusArrivals]);
+
+  /**
+   * User selects a bus stop
+   */
+  const handleSelectBusStop = useCallback(
+    (stop: BusStop) => {
+      setSelectedStop(stop);
+      selectedStopCodeRef.current = stop.code;
+      loadLiveBusArrivals(stop.code);
+    },
+    [loadLiveBusArrivals]
+  );
+
+  /**
+   * User manual refresh or periodic sync
+   */
+  const handleRefreshTimings = useCallback(async () => {
     setIsRefreshing(true);
 
-    setTimeout(() => {
-      // Simulate small dynamic headway adjustments
-      setBusStops((prevStops) =>
-        prevStops.map((stop) => ({
-          ...stop,
-          services: stop.services.map((svc) => {
-            const nextMins = Math.max(0, svc.nextBus.estimatedArrivalMinutes - 1);
-            // If bus reached 0 mins, cycle to the subsequent bus or simulate new arrival
-            const isRecycling = svc.nextBus.estimatedArrivalMinutes === 0;
-
-            return {
-              ...svc,
-              nextBus: isRecycling
-                ? svc.subsequentBus || {
-                    estimatedArrivalMinutes: 5,
-                    crowdLevel: 'SEA',
-                    deckType: 'DD',
-                    wheelchairAccessible: true,
-                  }
-                : { ...svc.nextBus, estimatedArrivalMinutes: nextMins },
-              subsequentBus: svc.subsequentBus
-                ? {
-                    ...svc.subsequentBus,
-                    estimatedArrivalMinutes: Math.max(
-                      nextMins + 3,
-                      svc.subsequentBus.estimatedArrivalMinutes - 1
-                    ),
-                  }
-                : undefined,
-              thirdBus: svc.thirdBus
-                ? {
-                    ...svc.thirdBus,
-                    estimatedArrivalMinutes: Math.max(
-                      (svc.subsequentBus?.estimatedArrivalMinutes || 7) + 6,
-                      svc.thirdBus.estimatedArrivalMinutes - 1
-                    ),
-                  }
-                : undefined,
-            };
-          }),
-        }))
-      );
-
-      // Also adjust MRT arrival timings
-      setMrtStations((prevStations) =>
-        prevStations.map((station) => ({
-          ...station,
-          lines: station.lines.map((line) => ({
-            ...line,
-            directions: line.directions.map((dir) => {
-              const nextMins = Math.max(0, dir.nextTrainMinutes - 1);
-              return {
-                ...dir,
-                nextTrainMinutes: dir.nextTrainMinutes === 0 ? 3 : nextMins,
-                subsequentTrainMinutes: Math.max(
-                  nextMins + 2,
-                  dir.subsequentTrainMinutes - 1
-                ),
-              };
-            }),
-          })),
-        }))
-      );
+    try {
+      if (activeTab === 'bus' && selectedStopCodeRef.current) {
+        await loadLiveBusArrivals(selectedStopCodeRef.current);
+      } else if (activeTab === 'mrt') {
+        const [stationsRes, alertsRes] = await Promise.allSettled([
+          fetchLiveTrainStations(),
+          fetchLiveTrainAlerts(),
+        ]);
+        if (stationsRes.status === 'fulfilled' && stationsRes.value.stations.length > 0) {
+          setMrtStations(stationsRes.value.stations);
+        }
+        if (alertsRes.status === 'fulfilled' && alertsRes.value.alerts.length > 0) {
+          setServiceAlerts(alertsRes.value.alerts);
+        }
+      }
 
       const now = new Date();
       setLastUpdatedTime(
@@ -128,32 +216,20 @@ export default function App() {
           hour12: false,
         })
       );
+    } catch (err) {
+      console.warn('Refresh error:', err);
+    } finally {
       setIsRefreshing(false);
-    }, 500);
-  }, []);
+    }
+  }, [activeTab, loadLiveBusArrivals]);
 
-  // Periodic automatic sync every 45s
+  // Periodic automatic sync every 30s
   useEffect(() => {
     const timer = setInterval(() => {
       handleRefreshTimings();
-    }, 45000);
+    }, 30000);
     return () => clearInterval(timer);
   }, [handleRefreshTimings]);
-
-  // Keep selectedStop and selectedStation synced if lists update
-  useEffect(() => {
-    if (selectedStop) {
-      const current = busStops.find((b) => b.id === selectedStop.id);
-      if (current) setSelectedStop(current);
-    }
-  }, [busStops]);
-
-  useEffect(() => {
-    if (selectedStation) {
-      const current = mrtStations.find((s) => s.id === selectedStation.id);
-      if (current) setSelectedStation(current);
-    }
-  }, [mrtStations]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
@@ -163,7 +239,7 @@ export default function App() {
         onTabChange={setActiveTab}
         favoriteBusStops={favoriteBusStops}
         onSelectBusStop={(stop) => {
-          setSelectedStop(stop);
+          handleSelectBusStop(stop);
           setActiveTab('bus');
         }}
       />
@@ -176,20 +252,23 @@ export default function App() {
             favoriteStopCodes={favoriteStopCodes}
             onToggleFavoriteStop={handleToggleFavoriteStop}
             selectedStop={selectedStop}
-            onSelectStop={setSelectedStop}
+            onSelectStop={handleSelectBusStop}
             onRefreshData={handleRefreshTimings}
             isRefreshing={isRefreshing}
             lastUpdatedTime={lastUpdatedTime}
+            isLoadingArrivals={isLoadingArrivals}
+            isLiveMode={isLiveMode}
           />
         ) : (
           <MrtTab
             mrtStations={mrtStations}
-            serviceAlerts={TRAIN_SERVICE_ALERTS}
+            serviceAlerts={serviceAlerts}
             selectedStation={selectedStation}
             onSelectStation={setSelectedStation}
             onRefreshData={handleRefreshTimings}
             isRefreshing={isRefreshing}
             lastUpdatedTime={lastUpdatedTime}
+            isLiveMode={isLiveMode}
           />
         )}
       </main>
@@ -201,13 +280,15 @@ export default function App() {
             Singapore Public Transport Information Hub • Real-time Bus Arrivals, MRT Network &amp; Platform Densities
           </div>
           <div className="flex items-center gap-3 text-[11px] text-slate-400">
-            <span>Land Transport Authority (LTA) Specification</span>
+            <span>Land Transport Authority (LTA) DataMall</span>
             <span>•</span>
-            <span className="text-emerald-400 font-mono">SGT Active</span>
+            <span className={`font-mono flex items-center gap-1.5 ${isLiveMode ? 'text-emerald-400' : 'text-slate-400'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isLiveMode ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
+              {isLiveMode ? 'LTA DataMall Live' : 'SGT Ready'}
+            </span>
           </div>
         </div>
       </footer>
     </div>
   );
 }
-

@@ -27,6 +27,7 @@ interface MrtTabProps {
   onRefreshData: () => void;
   isRefreshing: boolean;
   lastUpdatedTime: string;
+  isLiveMode?: boolean;
 }
 
 export const MrtTab: React.FC<MrtTabProps> = ({
@@ -37,6 +38,7 @@ export const MrtTab: React.FC<MrtTabProps> = ({
   onRefreshData,
   isRefreshing,
   lastUpdatedTime,
+  isLiveMode,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedArea, setSelectedArea] = useState<string>('All Areas');
@@ -92,7 +94,7 @@ export const MrtTab: React.FC<MrtTabProps> = ({
     );
   };
 
-  // Crowd density indicator helper
+  // Crowd density indicator helper (uses live PCDRealTime from LTA DataMall)
   const renderCrowdGauge = (crowd: MRTStation['crowdDensity']) => {
     let colorClass = 'text-emerald-400';
     let barBg = 'bg-emerald-500';
@@ -109,6 +111,9 @@ export const MrtTab: React.FC<MrtTabProps> = ({
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">
             <Users className="w-3.5 h-3.5 text-slate-400" /> Platform Crowd Density
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-950/80 text-blue-300 border border-blue-800/60">
+              PCD Real-Time
+            </span>
           </span>
           <span className={`text-xs font-bold ${colorClass}`}>
             {crowd.level} ({crowd.percentage}%)
@@ -505,8 +510,9 @@ export const MrtTab: React.FC<MrtTabProps> = ({
                                     }`}
                                   >
                                     <div>
-                                      <div className="text-[9px] uppercase tracking-wider font-mono text-slate-400">
-                                        Next Train
+                                      <div className="text-[9px] uppercase tracking-wider font-mono text-slate-400 flex items-center gap-1">
+                                        <span>Next Train</span>
+                                        <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-slate-800 text-blue-300">GTFS</span>
                                       </div>
                                       <div className="text-base font-extrabold font-mono leading-none mt-0.5">
                                         {isArrNext ? (
@@ -514,21 +520,6 @@ export const MrtTab: React.FC<MrtTabProps> = ({
                                         ) : (
                                           `${dir.nextTrainMinutes} min`
                                         )}
-                                      </div>
-                                    </div>
-
-                                    <div className="text-right border-l border-slate-700/60 pl-2.5">
-                                      <div className="text-[9px] text-slate-400">Crowd</div>
-                                      <div
-                                        className={`text-xs font-bold ${
-                                          dir.crowdLevel === 'Low'
-                                            ? 'text-emerald-400'
-                                            : dir.crowdLevel === 'Moderate'
-                                            ? 'text-amber-400'
-                                            : 'text-rose-400'
-                                        }`}
-                                      >
-                                        {dir.crowdLevel}
                                       </div>
                                     </div>
                                   </div>

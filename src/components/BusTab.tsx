@@ -27,6 +27,8 @@ interface BusTabProps {
   onRefreshData: () => void;
   isRefreshing: boolean;
   lastUpdatedTime: string;
+  isLoadingArrivals?: boolean;
+  isLiveMode?: boolean;
 }
 
 export const BusTab: React.FC<BusTabProps> = ({
@@ -38,6 +40,8 @@ export const BusTab: React.FC<BusTabProps> = ({
   onRefreshData,
   isRefreshing,
   lastUpdatedTime,
+  isLoadingArrivals = false,
+  isLiveMode = false,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedArea, setSelectedArea] = useState<string>('All Areas');
@@ -354,14 +358,18 @@ export const BusTab: React.FC<BusTabProps> = ({
                       {/* Services pills */}
                       <div className="flex flex-wrap items-center gap-1 mt-2.5">
                         <span className="text-[10px] text-slate-500 font-mono">Buses:</span>
-                        {stop.services.map((svc) => (
-                          <span
-                            key={svc.serviceNo}
-                            className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-900 text-slate-300 border border-slate-800 group-hover:border-slate-700"
-                          >
-                            {svc.serviceNo}
-                          </span>
-                        ))}
+                        {stop.services.length > 0 ? (
+                          stop.services.map((svc) => (
+                            <span
+                              key={svc.serviceNo}
+                              className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-900 text-slate-300 border border-slate-800 group-hover:border-slate-700"
+                            >
+                              {svc.serviceNo}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[10px] text-slate-500 italic">Tap to load live arrivals</span>
+                        )}
                       </div>
 
                       {stop.nearbyMrt && (
@@ -475,9 +483,24 @@ export const BusTab: React.FC<BusTabProps> = ({
 
               {/* Services List with Arrival Timings */}
               <div className="divide-y divide-slate-800/80 mt-1">
-                {displayedServices.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-slate-400">
-                    No services matching &quot;{serviceFilter}&quot; at this stop.
+                {isLoadingArrivals ? (
+                  <div className="py-12 text-center text-xs text-slate-400 flex flex-col items-center justify-center gap-2">
+                    <RefreshCw className="w-5 h-5 text-emerald-400 animate-spin" />
+                    <span className="font-medium text-slate-300">Fetching live arrivals from LTA DataMall v3...</span>
+                    <span className="text-[10px] text-slate-500 font-mono">Bus Stop {activeStop.code}</span>
+                  </div>
+                ) : displayedServices.length === 0 ? (
+                  <div className="py-10 text-center text-xs text-slate-400 px-4">
+                    {serviceFilter ? (
+                      <p>No services matching &quot;{serviceFilter}&quot; at this stop.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <p className="font-semibold text-slate-300">No active bus arrivals currently reported for this stop.</p>
+                        <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+                          Standard operating hours for Singapore buses are 05:30 to 24:00 daily. If outside operating hours, services will resume in the morning.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   displayedServices.map((service) => (
