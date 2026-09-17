@@ -248,7 +248,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5">
-        <div className={activeTab === 'bus' ? 'block' : 'hidden'}>
+        {activeTab === 'bus' && (
           <BusTab
             busStops={busStops}
             favoriteStopCodes={favoriteStopCodes}
@@ -261,8 +261,8 @@ export default function App() {
             isLoadingArrivals={isLoadingArrivals}
             isLiveMode={isLiveMode}
           />
-        </div>
-        <div className={activeTab === 'mrt' ? 'block' : 'hidden'}>
+        )}
+        {activeTab === 'mrt' && (
           <MrtTab
             mrtStations={mrtStations}
             serviceAlerts={serviceAlerts}
@@ -273,10 +273,8 @@ export default function App() {
             lastUpdatedTime={lastUpdatedTime}
             isLiveMode={isLiveMode}
           />
-        </div>
-        <div className={activeTab === 'talk' ? 'block' : 'hidden'}>
-          <TalkToUsTab isActive={activeTab === 'talk'} />
-        </div>
+        )}
+        {activeTab === 'talk' && <TalkToUsTab />}
       </main>
 
       {/* Footer info banner */}
