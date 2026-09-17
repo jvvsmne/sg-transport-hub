@@ -1,17 +1,26 @@
 import React, { useEffect } from 'react';
 import { MessageSquare, HeartHandshake, ShieldCheck, Sparkles } from 'lucide-react';
 
-export const TalkToUsTab: React.FC = () => {
-  useEffect(() => {
-    // Fixed canonical URL and unique page identifier for Disqus thread
-    const PAGE_IDENTIFIER = 'sg-transport-hub-talk-to-us';
-    const PAGE_URL =
-      typeof window !== 'undefined' && window.location.origin
-        ? `${window.location.origin}/talk-to-us`
-        : 'https://sg-transport-hub.vercel.app/talk-to-us';
+interface TalkToUsTabProps {
+  isActive?: boolean;
+}
 
-    const loadOrResetDisqus = () => {
-      // If Disqus is already loaded in the SPA, reload the thread
+export const TalkToUsTab: React.FC<TalkToUsTabProps> = ({ isActive = true }) => {
+  useEffect(() => {
+    if (!isActive) return;
+
+    // Real fixed values as configured for sg-transport-hub
+    const PAGE_URL = 'https://sg-transport-hub.vercel.app/talk-to-us';
+    const PAGE_IDENTIFIER = 'sg-transport-hub-talk-to-us';
+
+    const setupDisqus = () => {
+      // Set global disqus_config with exact page parameters
+      (window as any).disqus_config = function (this: any) {
+        this.page.url = PAGE_URL;
+        this.page.identifier = PAGE_IDENTIFIER;
+      };
+
+      // If Disqus is already loaded in the window, reset and reload the thread
       if (typeof (window as any).DISQUS !== 'undefined') {
         try {
           (window as any).DISQUS.reset({
@@ -19,28 +28,30 @@ export const TalkToUsTab: React.FC = () => {
             config: function (this: any) {
               this.page.url = PAGE_URL;
               this.page.identifier = PAGE_IDENTIFIER;
-              this.page.title = 'Talk to Us - SG Transport Hub';
             },
           });
-        } catch (e) {
-          console.warn('Error resetting Disqus thread:', e);
+        } catch (err) {
+          console.warn('Disqus reset error:', err);
         }
       } else {
-        // First time initialization
-        (window as any).disqus_config = function (this: any) {
-          this.page.url = PAGE_URL;
-          this.page.identifier = PAGE_IDENTIFIER;
-          this.page.title = 'Talk to Us - SG Transport Hub';
-        };
-
-        // Inject Disqus embed script if not already added to document
-        const existingScript = document.querySelector(
-          'script[src*="sg-transport-hub.disqus.com/embed.js"]'
-        );
-
-        if (!existingScript) {
+        // Embed the exact Disqus script
+        const existingScript = document.getElementById('disqus-embed-script') as HTMLScriptElement | null;
+        if (existingScript) {
+          existingScript.addEventListener('load', () => {
+            if (typeof (window as any).DISQUS !== 'undefined') {
+              (window as any).DISQUS.reset({
+                reload: true,
+                config: function (this: any) {
+                  this.page.url = PAGE_URL;
+                  this.page.identifier = PAGE_IDENTIFIER;
+                },
+              });
+            }
+          });
+        } else {
           const d = document;
           const s = d.createElement('script');
+          s.id = 'disqus-embed-script';
           s.src = 'https://sg-transport-hub.disqus.com/embed.js';
           s.setAttribute('data-timestamp', String(+new Date()));
           s.async = true;
@@ -49,13 +60,13 @@ export const TalkToUsTab: React.FC = () => {
       }
     };
 
-    // Ensure #disqus_thread container is rendered in DOM before loading/resetting
-    const timer = setTimeout(loadOrResetDisqus, 60);
+    // Ensure DOM container is mounted before executing setup
+    const timer = setTimeout(setupDisqus, 50);
 
     return () => {
       clearTimeout(timer);
     };
-  }, []);
+  }, [isActive]);
 
   return (
     <div className="space-y-6">
