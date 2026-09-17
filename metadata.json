@@ -1,0 +1,6 @@
+{
+  "name": "SG Transport Hub",
+  "description": "Interactive hub for Singapore public transport with real-time bus arrivals, load levels, wheelchair accessibility, and comprehensive MRT/LRT network station timings and service alerts.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
