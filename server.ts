@@ -23,14 +23,83 @@ const PORT = 3000;
 app.use(express.json());
 
 // API Routes FIRST
-app.get('/api/health', (req, res) => {
-  const ltaApiKeyConfigured = Boolean(
-    process.env.LTA_ACCOUNT_KEY && process.env.LTA_ACCOUNT_KEY.trim().length > 0
-  );
-  res.json({
-    ok: true,
-    ltaApiKeyConfigured,
-  });
+app.get('/api/health', async (req, res) => {
+  const apiKey = process.env.LTA_ACCOUNT_KEY?.trim();
+  const keyConfigured = Boolean(apiKey && apiKey.length > 0);
+
+  if (!keyConfigured || !apiKey) {
+    return res.json({
+      ok: false,
+      keyConfigured: false,
+      lta: {
+        reachable: false,
+        status: null,
+        statusText: 'LTA_ACCOUNT_KEY environment variable is not configured',
+        authenticated: false,
+        ms: 0,
+        endpoint: 'TrainServiceAlerts',
+      },
+      reachable: false,
+      status: null,
+      ms: 0,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  const startTime = performance.now();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const ltaResponse = await fetch('https://datamall2.mytransport.sg/ltaodataservice/TrainServiceAlerts', {
+      headers: {
+        AccountKey: apiKey,
+        accept: 'application/json',
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    const durationMs = Math.round(performance.now() - startTime);
+    const isSuccess = ltaResponse.ok;
+
+    return res.json({
+      ok: isSuccess,
+      keyConfigured: true,
+      lta: {
+        reachable: true,
+        status: ltaResponse.status,
+        statusText: ltaResponse.statusText || (isSuccess ? 'OK' : 'Error'),
+        authenticated: isSuccess,
+        ms: durationMs,
+        endpoint: 'TrainServiceAlerts',
+      },
+      reachable: true,
+      status: ltaResponse.status,
+      ms: durationMs,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    const durationMs = Math.round(performance.now() - startTime);
+
+    return res.json({
+      ok: false,
+      keyConfigured: true,
+      lta: {
+        reachable: false,
+        status: null,
+        statusText: err?.name === 'AbortError' ? 'Request timed out after 8000ms' : (err?.message || 'Connection failed'),
+        authenticated: false,
+        ms: durationMs,
+        endpoint: 'TrainServiceAlerts',
+      },
+      reachable: false,
+      status: null,
+      ms: durationMs,
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 // LTA API Test endpoint
