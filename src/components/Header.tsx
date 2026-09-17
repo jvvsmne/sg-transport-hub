@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bus, Train, Bookmark, BookmarkCheck, Clock, X, Trash2, ArrowRight } from 'lucide-react';
-import { BusStop } from '../types';
+import { Bus, Train, MessageSquare, Bookmark, BookmarkCheck, Clock, X, Trash2, ArrowRight } from 'lucide-react';
+import { BusStop, TransportMode } from '../types';
 
 interface HeaderProps {
-  activeTab: 'bus' | 'mrt';
-  onTabChange: (tab: 'bus' | 'mrt') => void;
+  activeTab: TransportMode;
+  onTabChange: (tab: TransportMode) => void;
   favoriteBusStops: BusStop[];
   onSelectBusStop: (stop: BusStop) => void;
   onToggleFavoriteStop?: (stopCode: string) => void;
@@ -84,12 +84,12 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Primary Two Tabs: BUS & MRT/LRT */}
+          {/* Primary Navigation Tabs: BUS, MRT/LRT & Talk to Us */}
           <nav className="flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl shadow-inner">
             <button
               id="tab-bus"
               onClick={() => onTabChange('bus')}
-              className={`flex items-center gap-2 px-3.5 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
                 activeTab === 'bus'
                   ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/25 ring-1 ring-emerald-400/50'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -102,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="tab-mrt"
               onClick={() => onTabChange('mrt')}
-              className={`flex items-center gap-2 px-3.5 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
                 activeTab === 'mrt'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 ring-1 ring-blue-400/50'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -110,6 +110,19 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Train className="w-4 h-4" />
               <span>MRT / LRT</span>
+            </button>
+
+            <button
+              id="tab-talk"
+              onClick={() => onTabChange('talk')}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+                activeTab === 'talk'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-500/25 ring-1 ring-purple-400/50'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>Talk to Us</span>
             </button>
           </nav>
 

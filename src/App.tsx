@@ -13,6 +13,7 @@ import {
 import { Header } from './components/Header';
 import { BusTab } from './components/BusTab';
 import { MrtTab } from './components/MrtTab';
+import { TalkToUsTab } from './components/TalkToUsTab';
 import {
   checkLtaStatus,
   fetchLiveBusStops,
@@ -247,7 +248,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5">
-        {activeTab === 'bus' ? (
+        {activeTab === 'bus' && (
           <BusTab
             busStops={busStops}
             favoriteStopCodes={favoriteStopCodes}
@@ -260,7 +261,8 @@ export default function App() {
             isLoadingArrivals={isLoadingArrivals}
             isLiveMode={isLiveMode}
           />
-        ) : (
+        )}
+        {activeTab === 'mrt' && (
           <MrtTab
             mrtStations={mrtStations}
             serviceAlerts={serviceAlerts}
@@ -272,6 +274,7 @@ export default function App() {
             isLiveMode={isLiveMode}
           />
         )}
+        {activeTab === 'talk' && <TalkToUsTab />}
       </main>
 
       {/* Footer info banner */}

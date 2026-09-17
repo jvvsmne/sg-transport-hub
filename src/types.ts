@@ -1,4 +1,4 @@
-export type TransportMode = 'bus' | 'mrt';
+export type TransportMode = 'bus' | 'mrt' | 'talk';
 
 export type BusCrowdLevel = 'SEA' | 'SDA' | 'LSD'; // Seats Available, Standing Available, Limited Standing
 export type BusDeckType = 'SD' | 'DD' | 'BD'; // Single Deck, Double Deck, Bendy
