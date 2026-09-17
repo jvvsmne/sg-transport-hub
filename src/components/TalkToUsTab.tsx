@@ -13,14 +13,14 @@ export const TalkToUsTab: React.FC<TalkToUsTabProps> = ({ isActive = true }) => 
     const PAGE_URL = 'https://sg-transport-hub.vercel.app/talk-to-us';
     const PAGE_IDENTIFIER = 'sg-transport-hub-talk-to-us';
 
-    const setupDisqus = () => {
-      // Set global disqus_config with exact page parameters
+    const loadOrResetDisqus = () => {
+      // 1. Set global disqus_config with exact recommended configuration variables
       (window as any).disqus_config = function (this: any) {
         this.page.url = PAGE_URL;
         this.page.identifier = PAGE_IDENTIFIER;
       };
 
-      // If Disqus is already loaded in the window, reset and reload the thread
+      // 2. If Disqus is already loaded on the page, reset the thread
       if (typeof (window as any).DISQUS !== 'undefined') {
         try {
           (window as any).DISQUS.reset({
@@ -30,38 +30,49 @@ export const TalkToUsTab: React.FC<TalkToUsTabProps> = ({ isActive = true }) => 
               this.page.identifier = PAGE_IDENTIFIER;
             },
           });
+          return;
         } catch (err) {
           console.warn('Disqus reset error:', err);
         }
-      } else {
-        // Embed the exact Disqus script
-        const existingScript = document.getElementById('disqus-embed-script') as HTMLScriptElement | null;
-        if (existingScript) {
-          existingScript.addEventListener('load', () => {
-            if (typeof (window as any).DISQUS !== 'undefined') {
-              (window as any).DISQUS.reset({
-                reload: true,
-                config: function (this: any) {
-                  this.page.url = PAGE_URL;
-                  this.page.identifier = PAGE_IDENTIFIER;
-                },
-              });
-            }
-          });
-        } else {
-          const d = document;
-          const s = d.createElement('script');
-          s.id = 'disqus-embed-script';
-          s.src = 'https://sg-transport-hub.disqus.com/embed.js';
-          s.setAttribute('data-timestamp', String(+new Date()));
-          s.async = true;
-          (d.head || d.body).appendChild(s);
-        }
       }
+
+      // 3. If the script was not yet added, inject the exact embed.js script
+      const existingScript = document.getElementById('disqus-embed-script');
+      if (!existingScript) {
+        const d = document;
+        const s = d.createElement('script');
+        s.id = 'disqus-embed-script';
+        s.src = 'https://sg-transport-hub.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', String(+new Date()));
+        s.async = true;
+        (d.head || d.body).appendChild(s);
+      }
+
+      // 4. In SPA environments, poll until window.DISQUS is ready to ensure thread renders
+      let checkCount = 0;
+      const pollTimer = setInterval(() => {
+        checkCount++;
+        if (typeof (window as any).DISQUS !== 'undefined') {
+          clearInterval(pollTimer);
+          try {
+            (window as any).DISQUS.reset({
+              reload: true,
+              config: function (this: any) {
+                this.page.url = PAGE_URL;
+                this.page.identifier = PAGE_IDENTIFIER;
+              },
+            });
+          } catch (e) {
+            // Already initialized or handling
+          }
+        } else if (checkCount > 40) {
+          clearInterval(pollTimer);
+        }
+      }, 150);
     };
 
-    // Ensure DOM container is mounted before executing setup
-    const timer = setTimeout(setupDisqus, 50);
+    // Ensure DOM container is mounted and visible
+    const timer = setTimeout(loadOrResetDisqus, 80);
 
     return () => {
       clearTimeout(timer);
