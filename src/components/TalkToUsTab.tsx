@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { MessageSquare, HeartHandshake, ShieldCheck, Sparkles, Loader2 } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { MessageSquare, HeartHandshake, ShieldCheck, Sparkles } from 'lucide-react';
 
 const DISQUS_SHORTNAME = 'sg-transport-hub';
 const CANONICAL_PAGE_URL = 'https://sg-transport-hub.vercel.app/';
@@ -8,112 +8,85 @@ const PAGE_TITLE = 'Talk to Us';
 const EMBED_SCRIPT_ID = 'disqus-embed-script';
 
 export const TalkToUsTab: React.FC = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
   useEffect(() => {
-    let isCancelled = false;
+    console.log('[Disqus] TalkToUsTab mounted');
 
-    // Helper to configure Disqus parameters
+    // 1. Ensure <div id="disqus_thread"> exists
+    const threadElem = document.getElementById('disqus_thread');
+    if (!threadElem) {
+      console.error('[Disqus] #disqus_thread container element not found in DOM');
+      return;
+    }
+
+    const disqusWindow = window as any;
+
+    // Helper configuration function
     const configureDisqus = function (this: any) {
       this.page.url = CANONICAL_PAGE_URL;
       this.page.identifier = PAGE_IDENTIFIER;
       this.page.title = PAGE_TITLE;
     };
 
-    const initOrReset = () => {
-      if (isCancelled) return;
+    // 2. If window.DISQUS already exists, reset instead of loading another script
+    if (typeof disqusWindow.DISQUS !== 'undefined') {
+      console.log('[Disqus] DISQUS already exists, resetting');
+      try {
+        disqusWindow.DISQUS.reset({
+          reload: true,
+          config: configureDisqus,
+        });
+      } catch (err) {
+        console.error('[Disqus] Error resetting DISQUS instance:', err);
+      }
+      return;
+    }
 
-      const disqusWindow = window as any;
+    // 3. Set window.disqus_config before loading the Disqus script
+    disqusWindow.disqus_config = configureDisqus;
 
-      // 1. If DISQUS global is already defined and loaded
-      if (typeof disqusWindow.DISQUS !== 'undefined') {
-        try {
-          disqusWindow.DISQUS.reset({
-            reload: true,
-            config: configureDisqus,
-          });
-          if (!isCancelled) {
-            setIsLoading(false);
+    // 4. Prevent duplicate script insertion
+    let script = document.getElementById(EMBED_SCRIPT_ID) as HTMLScriptElement | null;
+    if (!script) {
+      console.log('[Disqus] Loading embed.js');
+      script = document.createElement('script');
+      script.id = EMBED_SCRIPT_ID;
+      script.src = `https://${DISQUS_SHORTNAME}.disqus.com/embed.js`;
+      script.setAttribute('data-timestamp', String(+new Date()));
+      script.async = true;
+
+      script.onload = () => {
+        console.log('[Disqus] embed.js loaded');
+      };
+
+      script.onerror = (err) => {
+        console.error('[Disqus] Error loading embed.js', err);
+      };
+
+      (document.head || document.body).appendChild(script);
+    } else {
+      console.log('[Disqus] embed.js script tag already in DOM, waiting for DISQUS to initialize');
+      // If script is already inserted but DISQUS was still in flight
+      const checkInterval = setInterval(() => {
+        if (typeof disqusWindow.DISQUS !== 'undefined') {
+          clearInterval(checkInterval);
+          console.log('[Disqus] DISQUS became ready after script download, resetting');
+          try {
+            disqusWindow.DISQUS.reset({
+              reload: true,
+              config: configureDisqus,
+            });
+          } catch (err) {
+            console.error('[Disqus] Error resetting after script load:', err);
           }
-        } catch (err) {
-          console.warn('[Disqus] Error during DISQUS.reset:', err);
         }
-        return;
-      }
+      }, 100);
 
-      // 2. Set the global disqus_config for the first initialization
-      disqusWindow.disqus_config = configureDisqus;
-
-      // 3. Check if embed.js script is already in the document
-      let script = document.getElementById(EMBED_SCRIPT_ID) as HTMLScriptElement | null;
-
-      if (!script) {
-        script = document.createElement('script');
-        script.id = EMBED_SCRIPT_ID;
-        script.src = `https://${DISQUS_SHORTNAME}.disqus.com/embed.js`;
-        script.setAttribute('data-timestamp', String(+new Date()));
-        script.async = true;
-
-        script.onload = () => {
-          if (!isCancelled) {
-            setIsLoading(false);
-          }
-        };
-
-        script.onerror = (e) => {
-          console.error('[Disqus] Failed to load embed script:', e);
-          if (!isCancelled) {
-            setIsLoading(false);
-          }
-        };
-
-        (document.head || document.body).appendChild(script);
-      } else {
-        // Script tag exists but DISQUS might still be in transit/loading
-        const checkInterval = setInterval(() => {
-          if (typeof disqusWindow.DISQUS !== 'undefined') {
-            clearInterval(checkInterval);
-            if (!isCancelled) {
-              try {
-                disqusWindow.DISQUS.reset({
-                  reload: true,
-                  config: configureDisqus,
-                });
-              } catch (err) {
-                console.warn('[Disqus] Error in reset after script load:', err);
-              }
-              setIsLoading(false);
-            }
-          }
-        }, 100);
-
-        // Clear interval after 10 seconds to prevent leaking
-        const timeout = setTimeout(() => {
-          clearInterval(checkInterval);
-          if (!isCancelled) setIsLoading(false);
-        }, 10000);
-
-        return () => {
-          clearInterval(checkInterval);
-          clearTimeout(timeout);
-        };
-      }
-    };
-
-    // Use requestAnimationFrame to ensure the container <div id="disqus_thread"> is mounted in DOM
-    const rafId = requestAnimationFrame(() => {
-      initOrReset();
-    });
-
-    return () => {
-      isCancelled = true;
-      cancelAnimationFrame(rafId);
-      // Clean up disqus_thread container inner HTML to avoid ghost state on remount
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
-      }
-    };
+      const timeout = setTimeout(() => clearInterval(checkInterval), 10000);
+      return () => {
+        clearInterval(checkInterval);
+        clearTimeout(timeout);
+      };
+    }
   }, []);
 
   return (
@@ -176,17 +149,9 @@ export const TalkToUsTab: React.FC = () => {
       </div>
 
       {/* Disqus Embed Container Card */}
-      <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 sm:p-6 shadow-xl relative min-h-[420px]">
-        {isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 rounded-2xl z-10 backdrop-blur-sm">
-            <Loader2 className="w-8 h-8 text-purple-400 animate-spin mb-3" />
-            <p className="text-sm text-slate-300 font-medium">Loading discussion thread...</p>
-            <p className="text-xs text-slate-500 mt-1">Connecting to Disqus community</p>
-          </div>
-        )}
-
+      <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 sm:p-6 shadow-xl min-h-[420px]">
         {/* The required Disqus thread element */}
-        <div ref={containerRef} id="disqus_thread" className="min-h-[380px]"></div>
+        <div id="disqus_thread" className="min-h-[380px]"></div>
 
         <noscript>
           <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-400 text-center">
