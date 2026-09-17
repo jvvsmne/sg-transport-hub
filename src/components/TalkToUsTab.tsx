@@ -149,9 +149,24 @@ export const TalkToUsTab: React.FC = () => {
       </div>
 
       {/* Disqus Embed Container Card */}
-      <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 sm:p-6 shadow-xl min-h-[420px]">
+      <div
+        className="rounded-2xl border p-4 sm:p-6 shadow-xl min-h-[420px]"
+        style={{
+          backgroundColor: '#0f172a',
+          color: '#f8fafc',
+          borderColor: '#1e293b',
+          colorScheme: 'dark',
+        }}
+      >
         {/* The required Disqus thread element */}
-        <div id="disqus_thread" className="min-h-[380px]"></div>
+        <div
+          id="disqus_thread"
+          className="min-h-[380px]"
+          style={{
+            backgroundColor: 'transparent',
+            color: '#f8fafc',
+          }}
+        ></div>
 
         <noscript>
           <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-400 text-center">

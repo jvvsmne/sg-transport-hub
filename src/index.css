@@ -42,3 +42,10 @@
   color: #ffffff !important;
 }
 
+/* Ensure Disqus theme detector reads standard RGB / HEX values instead of modern OKLCH from Tailwind v4 */
+#disqus_thread {
+  color: #f1f5f9 !important;
+  background-color: transparent !important;
+  color-scheme: dark !important;
+}
+
