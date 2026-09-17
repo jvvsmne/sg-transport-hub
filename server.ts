@@ -24,7 +24,58 @@ app.use(express.json());
 
 // API Routes FIRST
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const ltaApiKeyConfigured = Boolean(
+    process.env.LTA_ACCOUNT_KEY && process.env.LTA_ACCOUNT_KEY.trim().length > 0
+  );
+  res.json({
+    ok: true,
+    ltaApiKeyConfigured,
+  });
+});
+
+// LTA API Test endpoint
+app.get('/api/lta-test', async (req, res) => {
+  const apiKey = process.env.LTA_ACCOUNT_KEY?.trim();
+  if (!apiKey) {
+    return res.status(400).json({
+      ok: false,
+      authenticated: false,
+      message: 'LTA_ACCOUNT_KEY environment variable is not configured on the server.',
+    });
+  }
+
+  try {
+    const ltaResponse = await fetch('https://datamall2.mytransport.sg/ltaodataservice/TrainServiceAlerts', {
+      headers: {
+        AccountKey: apiKey,
+        accept: 'application/json',
+      },
+    });
+
+    if (ltaResponse.ok) {
+      return res.json({
+        ok: true,
+        authenticated: true,
+        statusCode: ltaResponse.status,
+        message: 'Successfully authenticated with Singapore LTA DataMall API.',
+        endpointTested: 'TrainServiceAlerts',
+      });
+    } else {
+      return res.status(ltaResponse.status).json({
+        ok: false,
+        authenticated: false,
+        statusCode: ltaResponse.status,
+        statusText: ltaResponse.statusText,
+        message: `LTA DataMall rejected the request with status ${ltaResponse.status} (${ltaResponse.statusText}). Verify that your LTA_ACCOUNT_KEY is valid.`,
+      });
+    }
+  } catch (err: any) {
+    return res.status(502).json({
+      ok: false,
+      authenticated: false,
+      message: `Failed to connect to LTA DataMall: ${err?.message || 'Network error'}`,
+    });
+  }
 });
 
 // LTA Status check
