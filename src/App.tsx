@@ -238,6 +238,7 @@ export default function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         favoriteBusStops={favoriteBusStops}
+        onToggleFavoriteStop={handleToggleFavoriteStop}
         onSelectBusStop={(stop) => {
           handleSelectBusStop(stop);
           setActiveTab('bus');
